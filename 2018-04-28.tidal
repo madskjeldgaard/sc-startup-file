@@ -1,0 +1,21 @@
+import Sound.Tidal.MaxMspOsc
+
+a1 <- maxmspStream "127.0.0.1" 8010 1
+
+a1 
+$ fast 8
+$ sometimesBy 0.01 (0.1324 <~)
+$ degradeBy "<0 0 0.1 0.25 0.1 0.125 0.1234 0.5321 0.11234 0.1234 0.2143>"
+$ every 2 (rev . linger 2)
+$ sometimes (striate 18 . slow 1.5)
+$ slow (slow 32 $ "8 4") 
+$ randcat [
+n "0 2 7 9",
+n (e 3 5 "12")
+]
+# fold (slow 3 $ saw) 
+|+| n "[0,7,14]" 
+|-| n (discretise (1/5) $ slow 36 $ "0 12 24 12 24 12 5")
+# att (slow 89 $ saw)
+# rel (slow 111 $ saw)
+# velocity (scalex 0.25 0.6 $ rand) 

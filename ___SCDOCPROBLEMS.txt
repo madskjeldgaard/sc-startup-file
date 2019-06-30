@@ -1,0 +1,13 @@
+
+Pfunc
+No mention of the fact that first argument is the event itself
+
+Pbind(
+    \freq, 444,
+    \dur, 8, 
+    \postOSC, Pfunc({|event| 
+                    "This event as a raw OSC message: % ".format(event.asOSC).postln; 
+                }),
+).play;
+
+

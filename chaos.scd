@@ -1,0 +1,1 @@
+{c=ChaosGen.allSubclasses.collect(_.ar);r=Gendy3;s=SinOsc;LeakDC.ar(FreeVerb.ar(AllpassC.ar((s.ar(c*r.kr.lag*s.ar(r.kr(0.001, 10)*s.ar(r.kr(s.kr(0.11523))+s.ar(c)))).sum*0.1!2), 0.05, s.kr(r.kr.lag3).max,s.kr(s.kr*10).max*25).tanh.clip2*0.5,0.5, s.kr(r.kr.lag3).lag3.max, 0.99))}.play

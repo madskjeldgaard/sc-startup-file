@@ -1,0 +1,62 @@
+import Sound.Tidal.MIDI.Context
+
+displayOutputDevices >>= putStrLn
+
+devices <- midiDevices
+
+m1 <- midiStream devices "intmidi tidal" 1 synthController
+
+cps 1.25
+
+m1 silence
+
+m1 
+$ (|+| n 7)
+$ fast 2 
+$ stack [
+slow 2
+$ every 4 ((# nudge "0.125") . (# velocity 0.95))
+$ stack[
+n (e 3 7 "0"),
+n (e 3 8 "7"),
+n (e 3 9 "14")
+] 
+|-| n (discretise (1) $ "12 5 24")
+# legato 1
+# velocity (scalex 0.5 0.7 $ rand),
+fast 2 $ n 7 # velocity (slow 8 $ saw)
+]
+
+m1 silence
+
+d1 
+$ slow 1.2
+$ degradeBy (slow 16 $ "0 0.15 0.0 0.13")
+$ sometimes (# nudge (scale 0.01 0.05 $ rand))
+$ stack
+[
+n (e 3 5 "-11") # velocity (slow 13 $ saw),
+n (e 3 9 "2") # velocity (slow 3 $ saw),
+n (e 3 8 "9") # velocity (slow 6 $ saw),
+n (e 3 7 "16") # velocity (slow 9 $ saw),
+n (e 3 6 "23") # velocity 0.765
+] |-| n (slow 16 $ "0 5 3")
+|-| n (slow 32 $ "12 0 0 24")
+
+
+
+do
+    let a1 = 
+            sometimesBy 0.1 (linger 2.25)
+            $ sometimes (stut 8 0.5 0.2)
+            $ sometimes (jux (striate (irand 12)))
+            $ every 2 (rev)
+            $ n "[0 ~ 22 3 ~ 40 2 2 ~ ~  10]/4" 
+            # s "indu"
+            # legato 1.0
+            # speed "0.25 0.5 1.0"
+    d1 $ weave 32 (begin sine # legato (scalex 0.25 1.0 $ tri) # cutoff (scalex 50 15000 $ saw) ) [a1, palindrome $ a1 |*| speed 0.5]
+
+
+d1 $ slow 4 $ n (e 13 36 "0") # s "<indu zung>" # legato 4 # speed (scalex 0.25 1.0 $ slow 32 $ saw)
+    |+| n (irand 1000)

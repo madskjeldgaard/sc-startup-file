@@ -1,0 +1,405 @@
+/**************************** 
+        SAMPLE RELATED SYNTHS  
+*****************************/
+
+///
+(
+
+/* --- SYNTH: samplePlayer1 --- */
+SynthDef(\samplePlayer1, {
+    arg out=0, buffer, amp=1.0, rate=1, ratescale=1, trig=1, start=0, loop=0, effectBus=10, send=0,
+    loOrHi=0, gain=1, cutoff=25000, res=0, autopan=0, autopanfreq=1,
+    channels=2, atk=1, dur=1, rel=1, pan=0;
+    var env, sig, modder;
+
+    // Envelope
+    env = EnvGen.kr(Env([0, 1.0, 0.75, 0.0], [atk, dur, rel]), doneAction:2);
+
+    // Signal
+    modder = SinOsc.kr(autopanfreq, 0, autopan).range(-1,1);
+    modder = Select.kr(autopan > 0, [0, modder]);
+
+    sig = PlayBuf.ar(1, buffer, BufRateScale.kr(buffer) * rate * ratescale, trig,
+        start, loop, doneAction:2);
+    sig = Pan2.ar(sig, modder);
+
+    sig = DFM1.ar(sig, freq: cutoff , res: res, 
+        inputgain: gain, type:loOrHi, noiselevel: 0.005); 
+    sig = sig * env * amp;
+    Out.ar(out, sig );
+    Out.ar(effectBus, sig*send);
+}).add;
+
+/* --- SYNTH: samplePlayer2 --- */
+SynthDef(\samplePlayer2, {
+    arg out=0, buffer, amp=1.0, rate=1, ratescale=1, trig=1, 
+    start=0, loop=1, effectBus, send=0, shimmer=0,
+    loOrHi=0, gain=1, cutoff=25000, res=0, autopan=0, panfreq=1, 
+    pitchenv=0, pitchenvdest=0.001, filterenv=0,
+    fm=0, modfreq=440, am=0,
+    atk=1, dur=1, rel=1, pan=0;
+
+    var env, sig, panner, pitchenvelope, fmmod, ammod, filterenvelope;
+
+    // Modulation signals 
+    env = EnvGen.kr(Env([0, 1.0, 0.75, 0.0], [atk, dur, rel]), doneAction:2);
+
+    pitchenvelope = EnvGen.kr(Env([1, pitchenvdest], [atk+dur+rel], curve: 'exp'));
+    pitchenvelope = XFade2.kr(1, pitchenvelope, pitchenv.linexp(0, 1, -1, 1)); 
+
+    filterenvelope = EnvGen.kr(Env([1, 0.001], [atk+dur+rel], curve: 'exp'));
+    filterenvelope = XFade2.kr(1, filterenvelope, filterenv.linexp(0,1,-1, 1)); 
+
+    panner = SinOsc.kr(panfreq,0,autopan).range(-1,1);
+    panner = Select.kr(autopan > 0, [0, panner]);
+    
+    fmmod = SinOsc.ar(modfreq);
+    fmmod = XFade2.ar(DC.ar(1), fmmod, fm.linexp(0,1, -1.00,1.00)); 
+
+    ammod = SinOsc.ar(modfreq);
+    ammod = XFade2.ar(DC.ar(1), ammod, am.linexp(0,1,-1.00,1.00)); 
+    
+    // Signal
+    sig = PlayBuf.ar(2, buffer, 
+        BufRateScale.kr(buffer) * rate * ratescale * pitchenvelope * fmmod , 
+        trig, start * BufFrames.kr(buffer), loop, doneAction:2);
+
+    sig = sig * ammod;
+
+    sig = LeakDC.ar(sig);
+
+    sig = Balance2.ar(sig[0], sig[1], panner);
+    sig = Balance2.ar(sig[0], sig[1], pan);
+
+    sig = DFM1.ar(sig, freq: 10 + (cutoff * filterenvelope), res: res, 
+        inputgain: gain, type:loOrHi, noiselevel: 0.005); 
+
+    sig = sig * env * amp;
+
+    Out.ar(out, sig );
+    Out.ar(effectBus, sig*send);
+}).add;
+
+/* --- SYNTH: overlappingSamplePlayer2 --- */
+SynthDef(\overlappingSamplePlayer2, {
+    arg out=0, buffer, amp=1.0, rate=1, ratescale=1, trig=1, start=0, 
+    loop=1, effectBus=10, send=0,
+    loOrHi=0, gain=1, cutoff=25000, res=0, autopan=0, panfreq=1,
+    channels=2, atk=1, dur=1, rel=1, pan=0;
+    var env1, env2, buf1, buf2, sig, panner;
+
+    // Envelope
+    env1 = EnvGen.kr(Env([0, 1.0, 0.75, 0.0], [atk, dur, rel]), doneAction:0);
+    env2 = EnvGen.kr(Env([0, 1.0, 0.75, 0.0], [atk, dur, rel]), 
+        gate:XLine.kr(0,1,dur/2) ,doneAction:2);
+
+    panner = SinOsc.kr(panfreq,0,autopan).range(-1,1);
+    panner = Select.kr(autopan > 0, [0, panner]);
+
+    // Signal
+    // The overlapping loop is achieved by having two buffers being played at
+    // the same time and then crossfade between them
+
+    buf1 = PlayBuf.ar(2, buffer, 
+        BufRateScale.kr(buffer) * rate * ratescale, trig,
+        start, loop);
+
+    buf2 = PlayBuf.ar(2, buffer, 
+        BufRateScale.kr(buffer) * rate * ratescale, trig,
+        start + BufSamples.kr(buffer)/2, 
+        loop);
+
+    sig = XFade2.ar(buf1*env1, buf2*env2, 
+            //SinOsc.kr(dur.reciprocal) 
+            XLine.kr(1.0, -1.0, dur)
+                    );    
+
+    sig = Balance2.ar(sig[0], sig[1], panner);
+    sig = Balance2.ar(sig[0], sig[1], pan);
+
+    sig = DFM1.ar(sig, freq: cutoff , res: res, 
+        inputgain: gain, type:loOrHi, noiselevel: 0.005); 
+    sig = sig * amp;
+
+    Out.ar(out, sig );
+    Out.ar(effectBus, sig*send);
+}).add;
+
+/* --- SYNTH: bufferConvolve1--- */
+SynthDef(\bufferConvolve1, {
+    arg out=0, buffer1, buffer2, amp=1.0, rate=1, ratescale=1, trig=1, start=0, 
+    loop=1, effectBus=10, send=0, spread=1,
+    loOrHi=0, gain=1, cutoff=25000, res=0, autopan=0, panfreq=1,
+    channels=2, atk=1, dur=1, rel=1, pan=0;
+    var env1, env2, buf1, buf2, sig, panner;
+
+    // Envelope
+    env1 = EnvGen.kr(Env([0, 1.0, 0.75, 0.0], [atk, dur, rel]), doneAction:0);
+    
+    panner = SinOsc.kr(panfreq,0,autopan).range(-1,1);
+    panner = Select.kr(autopan > 0, [0, panner]);
+
+    // Signal
+    // The overlapping loop is achieved by having two buffers being played at
+    // the same time and then crossfade between them
+
+    buf1 = PlayBuf.ar(1, buffer1, 
+        BufRateScale.kr(buffer1) * rate * ratescale, trig,
+        start, loop);
+
+    buf2 = PlayBuf.ar(1, buffer2, 
+        BufRateScale.kr(buffer2) * rate * ratescale, trig,
+        start, 
+        loop);
+
+    sig = Convolution.ar(buf1*0.01, buf2); // Signal needs to attenuated in order to avoid distortion
+    
+    sig = DFM1.ar(sig, freq: cutoff , res: res, 
+        inputgain: gain, type:loOrHi, noiselevel: 0.005); 
+
+    sig = Pan2.ar(sig, panner);
+
+    sig = sig * amp * env1;
+
+    Out.ar(out, sig );
+    Out.ar(effectBus, sig*send);
+}).add;
+
+/* --- SYNTH: bufferConvolve2--- */
+SynthDef(\bufferConvolve2, {
+    arg out=0, buffer1, buffer2, amp=1.0, rate1=1, rate2=1, ratescale=1, trig=1, start=0, 
+    loop=0, effectBus=10, send=0,
+    loOrHi=0, gain=1, cutoff=25000, res=0, autopan=0, panfreq=1,
+    channels=2, atk=1, dur=1, rel=1, pan=0;
+    var env1, env2, buf1, buf2, sig, panner, sigL, sigR;
+
+    // Envelope
+    env1 = EnvGen.kr(Env([0, 1.0, 0.75, 0.0], [atk, dur, rel]), doneAction:0);
+    
+    panner = SinOsc.kr(panfreq,0,autopan).range(-1,1);
+    panner = Select.kr(autopan > 0, [0, panner]);
+
+    // Signal
+    // The overlapping loop is achieved by having two buffers being played at
+    // the same time and then crossfade between them
+
+    buf1 = PlayBuf.ar(2, buffer1, 
+        BufRateScale.kr(buffer1) * rate1 * ratescale, trig,
+        start, loop) * 0.05;// Signal needs to attenuated in order to avoid distortion
+
+
+    buf2 = PlayBuf.ar(2, buffer2, 
+        BufRateScale.kr(buffer2) * rate2 * ratescale, trig,
+        start, 
+        loop);
+
+    sigL = Convolution.ar(buf1[0], buf2[0], 512);     
+    sigR = Convolution.ar(buf1[1], buf2[0], 512); // Signal needs to attenuated in order to avoid distortion
+   
+    sig = Splay.ar([sigL, sigR]);
+    sig = Balance2.ar(sig[0], sig[1], panner);
+    sig = Balance2.ar(sig[0], sig[1], pan);
+
+    sig = DFM1.ar(sig, freq: cutoff , res: res, 
+        inputgain: gain, type:loOrHi, noiselevel: 0.005); 
+
+    sig = sig * amp * env1;
+
+    Out.ar(out, sig );
+    Out.ar(effectBus, sig*send);
+}).add;
+
+/* --- SYNTH: tartConvolve1--- */
+SynthDef(\tartConvolve1, {
+    arg out=0, inbus=0, buffer, amp=1.0, rate=1, ratescale=1, trig=1, start=0, 
+    loop=1, effectBus=10, send=0,
+    loOrHi=0, gain=1, cutoff=25000, res=0, autopan=0, panfreq=1,
+    channels=2, atk=1, dur=1, rel=1, pan=0;
+    var env, buf,sig, panner, sigL, sigR;
+
+    // Envelope
+    env = EnvGen.kr(Env([0, 1.0, 0.75, 0.0], [atk, dur, rel]), doneAction:2);
+    
+    panner = SinOsc.kr(panfreq,0,autopan).range(-1,1);
+    panner = Select.kr(autopan > 0, [0, panner]);
+
+    // Signal
+
+    buf = PlayBuf.ar(1, buffer, 
+        BufRateScale.kr(buffer) * rate * ratescale, trig,
+        start, loop);// Signal needs to attenuated in order to avoid distortion
+
+    sig = Convolution.ar(SinOsc.ar([440, 440 * (1 + (rate/10))] * rate)*0.0005, buf,  16384);     
+   
+    sig = DFM1.ar(sig, freq: cutoff , res: res, 
+        inputgain: gain, type:loOrHi, noiselevel: 0.005); 
+
+    sig = Pan2.ar(sig, panner);
+
+    sig = sig * amp * env;
+
+    Out.ar(out, sig );
+    Out.ar(effectBus, sig*send);
+}).add;
+
+/* --- SYNTH: tartConvolve2--- */
+SynthDef(\tartConvolve2, {
+    arg out=0, inbus=0, buffer, amp=1.0, rate=1, ratescale=1, trig=1, start=0, 
+    loop=1, effectBus=10, send=0,
+    loOrHi=0, gain=1, cutoff=25000, res=0, autopan=0, panfreq=1,
+    channels=2, atk=1, dur=1, rel=1, pan=0;
+    var env, buf,sig, panner, sigL, sigR;
+
+    // Envelope
+    env = EnvGen.kr(Env([0, 1.0, 0.75, 0.0], [atk, dur, rel]), doneAction:2);
+    
+    panner = SinOsc.kr(panfreq,0,autopan).range(-1,1);
+    panner = Select.kr(autopan > 0, [0, panner]);
+
+    // Signal
+
+    buf = PlayBuf.ar(2, buffer, 
+        BufRateScale.kr(buffer) * rate * ratescale, trig,
+        start, loop);// Signal needs to attenuated in order to avoid distortion
+
+    sig = Convolution.ar(SinOsc.ar([440, 440 * (1 + (rate/10))] * rate)*0.00025, buf,  16384);     
+   
+    sig = DFM1.ar(sig, freq: cutoff , res: res, 
+        inputgain: gain, type:loOrHi, noiselevel: 0.005); 
+
+    sig = Pan2.ar(sig, panner);
+
+    sig = sig * amp * env;
+
+    Out.ar(out, sig );
+    Out.ar(effectBus, sig*send);
+}).add;
+
+/* --- SYNTH: sawConvolve1--- */
+SynthDef(\sawConvolve1, {
+    arg out=0, inbus=0, buffer, amp=1.0, rate=1, ratescale=1, trig=1, start=0, 
+    loop=1, effectBus=10, send=0,
+    loOrHi=0, gain=1, cutoff=25000, res=0, autopan=0, panfreq=1,
+    channels=2, atk=1, dur=1, rel=1, pan=0;
+    var env, buf,sig, panner, sigL, sigR;
+
+    // Envelope
+    env = EnvGen.kr(Env([0, 1.0, 0.75, 0.0], [atk, dur, rel]), doneAction:2);
+    
+    panner = SinOsc.kr(panfreq,0,autopan).range(-1,1);
+    panner = Select.kr(autopan > 0, [0, panner]);
+
+    // Signal
+
+    buf = PlayBuf.ar(1, buffer, 
+        BufRateScale.kr(buffer) * rate * ratescale, trig,
+        start, loop);// Signal needs to attenuated in order to avoid distortion
+
+    sig = Convolution.ar( Saw.ar([440, 440 * (1 + (rate/10))] * rate)*0.00025, buf,  16384);     
+   
+    sig = DFM1.ar(sig, freq: cutoff , res: res, 
+        inputgain: gain, type:loOrHi, noiselevel: 0.005); 
+
+    sig = Pan2.ar(sig, panner);
+
+    sig = sig * amp * env;
+
+    Out.ar(out, sig );
+    Out.ar(effectBus, sig*send);
+}).add;
+
+/* --- SYNTH: lorenzConvolve1--- */
+SynthDef(\lorenzConvolve1, {
+    arg out=0, inbus=0, buffer, amp=1.0, rate=1, ratescale=1, trig=1, start=0, 
+    loop=1, effectBus=10, send=0,
+    loOrHi=0, gain=1, cutoff=25000, res=0, autopan=0, panfreq=1,
+    channels=2, atk=1, dur=1, rel=1, pan=0;
+    var env, buf,sig, panner, sigL, sigR;
+
+    // Envelope
+    env = EnvGen.kr(Env([0, 1.0, 0.75, 0.0], [atk, dur, rel]), doneAction:2);
+    
+    panner = SinOsc.kr(panfreq,0,autopan).range(-1,1);
+    panner = Select.kr(autopan > 0, [0, panner]);
+
+    // Signal
+
+    buf = PlayBuf.ar(1, buffer, 
+        BufRateScale.kr(buffer) * rate * ratescale, trig,
+        start, loop);// Signal needs to attenuated in order to avoid distortion
+
+    sig = Convolution.ar( LorenzL.ar(22000* rate)*0.0003, buf, 16384);     
+   
+    sig = DFM1.ar(sig, freq: cutoff, res: res, 
+        inputgain: gain, type:loOrHi, noiselevel: 0.005); 
+
+    sig = Pan2.ar(sig, panner);
+
+    sig = sig * amp * env;
+
+    Out.ar(out, sig );
+    Out.ar(effectBus, sig*send);
+}).add;
+
+/* --- SYNTH: simpleWarpPlayer2,--- */
+    SynthDef("simpleWarpPlayer2", {
+        arg out=0, buffer, amp=1.0, rate=1, ratescale=1, trig=1,  
+        detune=0.1, shimscale=15, 
+        grainsize=0.25, grainrandomization=0.01, // These arguments are specific to the warp players
+        start=0, loop=1, effectBus, send=0, 
+        loOrHi=0, gain=1, cutoff=25000, res=0, autopan=0, panfreq=1, q=2, 
+        pitchenv=0, pitchenvdest=0.001, filterenv=0,
+        fm=0, modfreq=440, am=0,
+        atk=1, dur=1, rel=1, pan=0;
+
+        var env, sig, panner, pitchenvelope, fmmod, ammod, filterenvelope, shim,
+        offsets, pointer;
+
+        // Modulation signals 
+        env = EnvGen.kr(Env([0, 1.0, 0.75, 0.0], [atk, dur, rel]), doneAction:2);
+
+        pitchenvelope = EnvGen.kr(Env([1, pitchenvdest], [atk+dur+rel], curve: 'exp'));
+        pitchenvelope = XFade2.kr(1, pitchenvelope, pitchenv.linexp(0, 1, -1, 1)); 
+
+        filterenvelope = EnvGen.kr(Env([1, 0.001], [atk+dur+rel], curve: 'exp'));
+        filterenvelope = XFade2.kr(1, filterenvelope, filterenv.linexp(0,1,-1, 1)); 
+
+        panner = SinOsc.kr(panfreq,0,autopan).range(-1,1);
+        panner = Select.kr(autopan > 0, [0, panner]);
+        
+        fmmod = SinOsc.ar(modfreq);
+        fmmod = XFade2.ar(DC.ar(1), fmmod, fm.linexp(0,1, -1.00,1.00)); 
+
+        ammod = SinOsc.ar(modfreq);
+        ammod = XFade2.ar(DC.ar(1), ammod, am.linexp(0,1,-1.00,1.00)); 
+        
+        // Signal
+        pointer = LFSaw.ar(fmmod * rate*BufDur.ir(buffer).reciprocal).range(0, BufFrames.ir(buffer));
+
+        sig =  Warp1.ar(2, bufnum: buffer, pointer: pointer, freqScale: rate,
+            windowSize: grainsize, envbufnum: -1, overlaps: 8, windowRandRatio:
+            grainrandomization, interp: 4) ;
+
+        sig = sig * ammod;
+
+        sig = BPF.ar(sig, 20 + (rate * 1000 * filterenv), q); 
+
+        sig = LeakDC.ar(sig);
+
+        sig = Splay.ar(sig);
+
+        sig = Balance2.ar(sig[0], sig[1], panner);
+        sig = Balance2.ar(sig[0], sig[1], pan);
+
+        sig = sig * env * amp;
+
+        Out.ar(out, sig );
+        Out.ar(effectBus, sig*send);
+    }).add;
+
+///
+)
+
+
+
+

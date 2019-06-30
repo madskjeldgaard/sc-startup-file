@@ -1,0 +1,23 @@
+import Sound.Tidal.MIDI.Context
+
+displayOutputDevices >>= putStrLn
+
+devices <- midiDevices
+
+-- FIREFACE 110 
+m1 <- midiStream devices "Fireface UFX (23323333) Port 1" 1 synthController
+
+
+
+cps 1.1
+
+m1 
+$ fast 8 
+$ every 3 ( slow 2 . (0.125 ~>) )
+$ sometimesBy 0.0001 (|+| n 3)
+$ n (e 3 5 "0 1 2")
+|=| velocity (scalex 0.75 1.0 $ slow 8 $ saw) 
+|=| modwheel (slow 1.5 $ "0 0.5 0.25 0.75 0.9") 
+|-| n 24 
+
+:wqa1 silence
